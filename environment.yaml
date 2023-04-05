@@ -1,0 +1,10 @@
+name: nationbuilder-certification
+channels:
+    - conda-forge
+dependencies:
+    - python=3.10
+    - rauth=0.7.3
+    - fastapi=0.95.0
+    - uvicorn=0.21.1
+    - pydantic=1.10.7
+    - python-dotenv=1.0.0

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nationbuilder API</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background-color: Cornsilk;
+    }
+    #api-root {
+      height: 100%;
+    }
+    input[type="time"]::-webkit-calendar-picker-indicator {
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="api-root"></div>
+  <script type="importmap">
+  {
+    "imports": {
+      "index": "./index.js",
+      "@lion/calendar/define": "https://ga.jspm.io/npm:@lion/calendar@0.20.1/lion-calendar.js",
+      "arrow-tags": "https://cdn.jsdelivr.net/npm/arrow-tags@1.0.0-beta.7/dist/index.mjs",
+      "@arrow-js/core": "https://cdn.jsdelivr.net/npm/@arrow-js/core@1.0.0-alpha.9/dist/index.mjs"
+    },
+    "scopes": {
+      "https://cdn.jsdelivr.net/": {},
+      "https://ga.jspm.io/": {
+        "@bundled-es-modules/message-format/MessageFormat.js": "https://ga.jspm.io/npm:@bundled-es-modules/message-format@6.0.4/MessageFormat.js",
+        "@lion/calendar/translations/": "https://ga.jspm.io/npm:@lion/calendar@0.20.1/translations/",
+        "@lion/core": "https://ga.jspm.io/npm:@lion/core@0.24.0/index.js",
+        "@lion/localize": "https://ga.jspm.io/npm:@lion/localize@0.26.0/index.js",
+        "@lit/reactive-element": "https://ga.jspm.io/npm:@lit/reactive-element@1.6.1/development/reactive-element.js",
+        "@lit/reactive-element/": "https://ga.jspm.io/npm:@lit/reactive-element@1.6.1/development/",
+        "@open-wc/dedupe-mixin": "https://ga.jspm.io/npm:@open-wc/dedupe-mixin@1.3.1/index.js",
+        "@open-wc/scoped-elements": "https://ga.jspm.io/npm:@open-wc/scoped-elements@2.1.4/index.js",
+        "lit": "https://ga.jspm.io/npm:lit@2.7.2/index.js",
+        "lit-element/lit-element.js": "https://ga.jspm.io/npm:lit-element@3.3.1/development/lit-element.js",
+        "lit-html": "https://ga.jspm.io/npm:lit-html@2.7.2/development/lit-html.js",
+        "lit-html/": "https://ga.jspm.io/npm:lit-html@2.7.2/development/",
+        "lit/": "https://ga.jspm.io/npm:lit@2.7.2/",
+        "singleton-manager": "https://ga.jspm.io/npm:singleton-manager@1.6.1/src/index.js"
+      } 
+    }
+  }
+  </script>
+  <!-- ES Module Shims: Import maps polyfill for modules browsers without import maps support (Safari 16.3) 
+    <script async src="https://ga.jspm.io/npm:es-module-shims@1.5.1/dist/es-module-shims.js" crossorigin="anonymous"></script>
+  --->
+  <script type="module">
+    import main from 'index';
+    main();
+  </script>
+</body>
