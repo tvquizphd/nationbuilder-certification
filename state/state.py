@@ -1,5 +1,6 @@
 from pydantic import BaseSettings
 from typing import Dict, List
+from models import HasEvent
 from threading import Lock
 from pathlib import Path
 import json
@@ -9,14 +10,14 @@ class Session(BaseSettings):
     token: str
 
 class Events(BaseSettings):
-    events: List[Dict[str, str]]
+    events: List[HasEvent]
 
 class Pages(BaseSettings):
     pages: List[Dict[str, str]]
 
 TYPES = {
-    "events": Events,
     "pages": Pages,
+    "events": Events,
     "session": Session
 }
 LOCKS = { k: Lock() for k in TYPES.keys() }

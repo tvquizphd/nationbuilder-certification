@@ -70,6 +70,10 @@ async def create_event(e: HasEvent, config=Depends(to_config), token=to_token())
     # Submit request in parallel
     pool.submit(asyncio.run, post_event())
 
+@nationbuilder.get("/api/pages/events")
+def list_events(config=Depends(to_config), token=to_token()):
+    return to_service(config).get_api(to_token(), '/pages/events')
+
 @nationbuilder.get("/api/pages/basic_pages")
 def list_basic_pages(config=Depends(to_config), token=to_token()):
     return to_service(config).get_api(to_token(), '/pages/basic_pages')
@@ -99,14 +103,21 @@ async def _create_event(request: Request):
     event = json.loads((await request.body()).decode('utf-8'))
     set_state('events', events=[event])
 
+@nationbuilder.get("/mockup/api/v1/pages/events")
+def _list_events(format: str):
+    def to_events():
+        events = to_state("events")
+        if events is None: return []
+        return events.events 
+    return { "results": to_events() }
+
 @nationbuilder.get("/mockup/api/v1/pages/basic_pages")
 def _list_basic_pages(format: str):
     def to_pages():
         pages = to_state("pages")
         if pages is None: return []
         return pages.pages 
-    pages = to_pages()
-    return { "results": pages }
+    return { "results": to_pages() }
 
 # "Ask a nation's administrator for access"
 @nationbuilder.get("/mockup/oauth/authorize", status_code=_204)

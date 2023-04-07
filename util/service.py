@@ -23,8 +23,12 @@ class Service():
         headers = {'content-type': 'application/json'}
         session = self.oauth.get_session(token)
         target = self.config.api_url + endpoint
-        r = session.get(target, params=params, headers=headers)
-        return json.loads(r._content.decode('utf-8')) 
+        try:
+            r = session.get(target, params=params, headers=headers)
+            return json.loads(r._content.decode('utf-8')) 
+        except Exception as e:
+            print('what?')
+            return dict()
 
 
 def to_service(config):

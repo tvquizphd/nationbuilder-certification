@@ -42,9 +42,15 @@ const toMockEvent = () => {
   }  
 }
 
+const fromEventDate = (ev) => {
+  const { start_time } = ev;
+  return Date.parse(start_time);
 
+}
 const setLitDate = (cal_id, date) => {
-  const root = document.getElementById(cal_id).shadowRoot;
+  const cal_el = document.getElementById(cal_id);
+  if (cal_el === null) return;
+  const root = cal_el.shadowRoot;
   const event_name = 'user-selected-date-changed';
   root.host.__focusedDate = date;
   root.host.selectedDate = date;
@@ -79,6 +85,7 @@ class T {
   static button_on = `
     ${T.b_main} ${T.t_light} 
     border: none;
+    cursor: pointer;
     border-radius: 0.5rem;
     box-shadow: 0px 0px 4px 2px rgba(0, 0, 0, 0.40), 
                -4px 6px 8px 0px rgba(0, 0, 0, 0.40);
@@ -100,9 +107,8 @@ class T {
   `
 }
 
-const postEvent = async (d) => {
+const postEvent = async (url) => {
   const data = toMockEvent();
-  const url = "/api/pages/events";
   return await fetch(url, {
     method: "POST", cache: "no-cache",
     headers: { "Content-Type": "application/json" },
@@ -110,46 +116,56 @@ const postEvent = async (d) => {
   })
 }
 
-const createEvent = (d) => { 
-  postEvent(d).then(() => {
-    console.log('POSTED');
-  }).catch((e) => {
-    console.error(e);
-  })
+const createEvent = (cal_id) => {
+  return (d) => { 
+    const url = "/api/pages/events";
+    postEvent(url).then(async () => {
+      const response = await fetch(url);
+      const { results } = await response.json();
+      d.sources.events = results;
+      if (results.length) {
+        const ev = results[0].event;
+        const ev_date = fromEventDate(ev);
+        setLitDate(cal_id, new Date(ev_date));
+      }
+    }).catch((e) => {
+      console.error(e);
+    })
 
-  if (!d.tests.event_test.hidden) {
-    d.tests.event_test.hidden = true;
-    d.tests.event_test.forms = [];
+    if (!d.tests.event_test.hidden) {
+      d.tests.event_test.hidden = true;
+      d.tests.event_test.forms = [];
+      return d;
+    }
+    d.tests.event_test.hidden = false;
+    d.tests.event_test.forms = [[{
+      legend: 'Event Info', 
+      style: `
+        ${T.center} ${T.flex_fit} gap: 0.5rem;
+      `,
+      name: 'info', 
+      fields: [
+        { name: "name" },
+        { name: "intro" },
+        { name: "venue" },
+        { name: "person" },
+        { name: "status" },
+      ]
+    }, {
+      legend: 'Schedule (US Eastern Time)',
+      style: `
+        ${T.center} ${T.flex_fit} gap: 0.5rem;
+      `,
+      name: 'schedule',
+      fields: [
+        { name: "start_time" },
+        { name: "end_time" },
+        { name: "date", readonly: true, class: "date" },
+        { name: "calendar" },
+      ]
+    }]];
     return d;
   }
-  d.tests.event_test.hidden = false;
-  d.tests.event_test.forms = [[{
-    legend: 'Event Info', 
-    style: `
-      ${T.center} ${T.flex_fit} gap: 0.5rem;
-    `,
-    name: 'info', 
-    fields: [
-      { name: "name" },
-      { name: "intro" },
-      { name: "venue" },
-      { name: "person" },
-      { name: "status" },
-    ]
-  }, {
-    legend: 'Schedule (US Eastern Time)',
-    style: `
-      ${T.center} ${T.flex_fit} gap: 0.5rem;
-    `,
-    name: 'schedule',
-    fields: [
-      { name: "start_time" },
-      { name: "end_time" },
-      { name: "date", readonly: true, class: "date" },
-      { name: "calendar" },
-    ]
-  }]];
-  return d;
 }
 const setMessage = (d) => {
   const msgs = [
@@ -372,13 +388,13 @@ const toPageCore = (fn) => {
   return Div`${fn}`(props);
 }
 
-const toNavItems = (pre, d) => {
+const toNavItems = (pre, cal_id, d) => {
   const out = [[
       () => {
         const { hidden } =  d.tests.event_test;
         return ['New Event', 'Hide Event'][+!hidden];
       },
-      { '@click': ev(createEvent, d) }
+      { '@click': ev(createEvent(cal_id), d) }
     ],[
       () => `${d.msg}, ${d.n} pages!`,
       { '@click': ev(setMessage, d) }
@@ -414,6 +430,9 @@ const toDefault = () => {
     n: -1,
     msg: 'Welcome',
     who: 'John',
+    sources: {
+      events: [],
+    },
     tests: {
       event_test: toDefaultEvent(),
       event_person: toDefaultEvent(),
@@ -487,7 +506,7 @@ const main = () => {
   const data = reactive(toDefault());
   const { render } = ArrowTags;
   const toLabel = d => {
-   return toNavItems('test', d);
+   return toNavItems('test', cal_id, d);
   }
   const nav = toPageNav(toLabel);
   const core = toPageCore(toSections(cal_id));
