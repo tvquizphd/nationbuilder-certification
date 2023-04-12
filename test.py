@@ -51,7 +51,7 @@ if __name__ == "__main__":
     })
 
     # Test the API
-    if not args.redirect: print(f'Missing {to_help("URL")}')
+    if not args.redirect: print(f'test.py -L to run without credentials, or see test.py -h')
     elif not args.client_id: print(f'Missing {to_help("ID")}')
     elif not args.client_secret: print(f'Missing {to_help("Secret")}')
     else:

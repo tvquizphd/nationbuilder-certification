@@ -78,7 +78,7 @@ def list_events(config=Depends(to_config), token=to_token()):
 def list_basic_pages(config=Depends(to_config), token=to_token()):
     return to_service(config).get_api(to_token(), '/pages/basic_pages')
 
-@nationbuilder.post("/api/redirect")
+@nationbuilder.post("/api/redirect", status_code=_201)
 async def handle_redirect(data: HasCode, config=Depends(to_config), status_code=_204):
     oauth = to_service(config).oauth
     async def get_token(**kwargs):
@@ -97,19 +97,22 @@ async def handle_redirect(data: HasCode, config=Depends(to_config), status_code=
 '''
 For testing locally without credentials
 '''
+def to_events():
+    events = to_state("events")
+    if events is None: return []
+    return events.events
 
-@nationbuilder.post("/mockup/api/v1/pages/events")
+@nationbuilder.post("/mockup/api/v1/pages/events", status_code=_201)
 async def _create_event(request: Request):
     event = json.loads((await request.body()).decode('utf-8'))
-    set_state('events', events=[event])
+    events = [e.dict() for e in to_events()]
+    event["id"] = len(events)
+    set_state('events', events=[event, *events])
 
 @nationbuilder.get("/mockup/api/v1/pages/events")
 def _list_events(format: str):
-    def to_events():
-        events = to_state("events")
-        if events is None: return []
-        return events.events 
-    return { "results": to_events() }
+    results = [e.event for e in to_events()] 
+    return { "results": results }
 
 @nationbuilder.get("/mockup/api/v1/pages/basic_pages")
 def _list_basic_pages(format: str):
