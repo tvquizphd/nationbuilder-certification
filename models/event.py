@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Optional
 
 class Contact(BaseModel):
     name: str
@@ -27,11 +28,11 @@ class Venue(BaseModel):
     name: str
     address: Address
 
-
 class Event(BaseModel):
     status: str
     name: str
     intro: str
+    id: Optional[int]
     time_zone: str
     start_time: str
     end_time: str

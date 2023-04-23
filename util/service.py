@@ -10,6 +10,19 @@ class Service():
         self.oauth = service
         self.config = config
 
+    async def delete_api(self, token, endpoint):
+        if token is None: return
+        session = self.oauth.get_session(token)
+        target = self.config.api_url + endpoint
+        session.delete(target)
+
+    async def put_api(self, token, endpoint, data):
+        if token is None: return
+        headers = {'content-type': 'application/json'}
+        session = self.oauth.get_session(token)
+        target = self.config.api_url + endpoint
+        session.put(target, json=data, headers=headers)
+
     async def post_api(self, token, endpoint, data):
         if token is None: return
         headers = {'content-type': 'application/json'}

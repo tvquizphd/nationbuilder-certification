@@ -3,6 +3,7 @@ from starlette.status import HTTP_204_NO_CONTENT as _204
 from starlette.status import HTTP_201_CREATED as _201
 from fastapi.exceptions import RequestValidationError
 from concurrent.futures import ThreadPoolExecutor
+from fastapi.exceptions import HTTPException
 from starlette.responses import FileResponse 
 from fastapi.responses import JSONResponse
 from starlette.requests import Request
@@ -11,6 +12,8 @@ from state import set_state, to_state
 from fastapi import Depends, FastAPI
 from urllib.parse import parse_qs
 from pydantic import BaseModel
+from models import HasBasicPage
+from models import HasPerson
 from models import HasEvent
 import requests
 import asyncio
@@ -51,6 +54,11 @@ async def open_root():
 async def open_root():
     return FileResponse('static/index.js')
 
+@nationbuilder.get("/country_code.js")
+async def open_root():
+    return FileResponse('static/country_code.js')
+
+
 '''
 Proxy to fetch real/mocked Nationbuilder endpoints
 '''
@@ -62,11 +70,97 @@ def open_root(config=Depends(to_config)):
     if token is None: return vars(config)
     return { **vars(config), "token": token }
 
-@nationbuilder.post("/api/pages/events", status_code=_201)
-async def create_event(e: HasEvent, config=Depends(to_config), token=to_token()):
-    async def post_event():
+'''
+Person
+'''
+
+@nationbuilder.delete("/api/people/{who}", status_code=_204)
+async def delete_person(
+        who: int, config=Depends(to_config), token=to_token()
+    ):
+    async def delete_person():
+        url = f'/people/{who}'
+        await to_service(config).delete_api(to_token(), url)
+    # TODO Fix: 404 only works locally!
+    try:
+        persons = [e.dict() for e in to_persons()]
+        next(e for e in persons if is_who(e, who))
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=404, detail="No such person")
+    # Submit request in parallel
+    pool.submit(asyncio.run, delete_person())
+
+@nationbuilder.put("/api/people/{who}")
+async def update_person(
+        who: int, e: HasPerson, config=Depends(to_config), token=to_token()
+    ):
+    async def put_person():
+        url = f'/people/{who}'
         data = json.loads(e.json())
-        await to_service(config).post_api(to_token(), '/pages/events', data)
+        await to_service(config).put_api(to_token(), url, data)
+    # Submit request in parallel
+    pool.submit(asyncio.run, put_person())
+
+@nationbuilder.post("/api/people", status_code=_201)
+async def create_person(
+        e: HasPerson, config=Depends(to_config), token=to_token()
+    ):
+    async def post_person():
+        url = '/people'
+        data = json.loads(e.json())
+        await to_service(config).post_api(to_token(), url, data)
+    # Submit request in parallel
+    pool.submit(asyncio.run, post_person())
+
+@nationbuilder.get("/api/people")
+def list_persons(config=Depends(to_config), token=to_token()):
+    return to_service(config).get_api(to_token(), '/people')
+
+'''
+Basic Page
+'''
+
+@nationbuilder.post("/api/basic_pages", status_code=_201)
+async def create_basic_page(
+        e: HasBasicPage, config=Depends(to_config), token=to_token()
+    ):
+    async def post_basic_page():
+        url = '/sites/foobar-fake-site/pages/basic_pages'
+        data = json.loads(e.json())
+        await to_service(config).post_api(to_token(), url, data)
+    # Submit request in parallel
+    pool.submit(asyncio.run, post_basic_page())
+
+@nationbuilder.get("/api/basic_pages")
+def list_basic_pages(config=Depends(to_config), token=to_token()):
+    url = '/sites/foobar-fake-site/pages/basic_pages'
+    return to_service(config).get_api(to_token(), url)
+
+
+'''
+Event
+'''
+
+@nationbuilder.put("/api/pages/events/{ev}")
+async def update_event(
+        ev: int, e: HasEvent, config=Depends(to_config), token=to_token()
+    ):
+    async def put_event():
+        url = f'/pages/events/{ev}'
+        data = json.loads(e.json())
+        await to_service(config).put_api(to_token(), url, data)
+    # Submit request in parallel
+    pool.submit(asyncio.run, put_event())
+
+@nationbuilder.post("/api/pages/events", status_code=_201)
+async def create_event(
+        e: HasEvent, config=Depends(to_config), token=to_token()
+    ):
+    async def post_event():
+        url = '/pages/events'
+        data = json.loads(e.json())
+        await to_service(config).post_api(to_token(), url, data)
     # Submit request in parallel
     pool.submit(asyncio.run, post_event())
 
@@ -95,32 +189,104 @@ async def handle_redirect(data: HasCode, config=Depends(to_config), status_code=
     pool.submit(asyncio.run, get_token(**vars(data)))
 
 '''
-For testing locally without credentials
+Basic Pages, mocked
 '''
+
+def to_basic_pages():
+    basic_pages = to_state("basic_pages")
+    if basic_pages is None: return []
+    return basic_pages.basic_pages
+
+@nationbuilder.get("/mockup/api/v1/sites/{site}/pages/basic_pages")
+def _list_basic_pages(format: str, site: str):
+    results = [e.basic_page for e in to_basic_pages()] 
+    return { "results": results }
+
+@nationbuilder.post("/mockup/api/v1/sites/{site}/pages/basic_pages", status_code=_201)
+async def _create_basic_page(request: Request):
+    basic_page = json.loads((await request.body()).decode('utf-8'))
+    basic_pages = [e.dict() for e in to_basic_pages()]
+    basic_page["basic_page"]["id"] = len(basic_pages)
+    set_state('basic_pages', basic_pages=[basic_page, *basic_pages])
+
+'''
+Person, mocked
+'''
+
+def to_persons():
+    persons = to_state("persons")
+    if persons is None: return []
+    return persons.persons
+
+def is_who(e, who):
+    return e["person"]["id"] == who
+
+def update_who(e, who, person):
+    if is_who(e, who):
+        e["person"].update(person["person"])
+        return True
+    return False
+
+@nationbuilder.delete("/mockup/api/v1/people/{who}", status_code=_204)
+async def _delete_person(who: int, request: Request):
+    persons = [e.dict() for e in to_persons()]
+    persons = [e for e in persons if not is_who(e, who)]
+    set_state('persons', persons=persons)
+
+@nationbuilder.put("/mockup/api/v1/people/{who}", status_code=_201)
+async def _update_person(who: int, request: Request):
+    person = json.loads((await request.body()).decode('utf-8'))
+    person["person"].pop("id", None)
+    persons = [e.dict() for e in to_persons()]
+    next(e for e in persons if update_who(e, who, person))
+    set_state('persons', persons=persons)
+
+@nationbuilder.post("/mockup/api/v1/people", status_code=_201)
+async def _create_person(request: Request):
+    person = json.loads((await request.body()).decode('utf-8'))
+    persons = [e.dict() for e in to_persons()]
+    person["person"]["id"] = len(persons)
+    set_state('persons', persons=[person, *persons])
+
+@nationbuilder.get("/mockup/api/v1/people")
+def _list_persons(format: str):
+    results = [e.person for e in to_persons()] 
+    return { "results": results }
+
+'''
+Event, mocked
+'''
+
 def to_events():
     events = to_state("events")
     if events is None: return []
     return events.events
 
+def update_ev(e, ev, event):
+    if e["event"]["id"] == ev:
+        e["event"].update(event["event"])
+        return True
+    return False
+
+@nationbuilder.put("/mockup/api/v1/pages/events/{ev}", status_code=_201)
+async def _update_event(ev: int, request: Request):
+    event = json.loads((await request.body()).decode('utf-8'))
+    event["event"].pop("id", None)
+    events = [e.dict() for e in to_events()]
+    next(e for e in events if update_ev(e, ev, event))
+    set_state('events', events=events)
+
 @nationbuilder.post("/mockup/api/v1/pages/events", status_code=_201)
 async def _create_event(request: Request):
     event = json.loads((await request.body()).decode('utf-8'))
     events = [e.dict() for e in to_events()]
-    event["id"] = len(events)
+    event["event"]["id"] = len(events)
     set_state('events', events=[event, *events])
 
 @nationbuilder.get("/mockup/api/v1/pages/events")
 def _list_events(format: str):
     results = [e.event for e in to_events()] 
     return { "results": results }
-
-@nationbuilder.get("/mockup/api/v1/pages/basic_pages")
-def _list_basic_pages(format: str):
-    def to_pages():
-        pages = to_state("pages")
-        if pages is None: return []
-        return pages.pages 
-    return { "results": to_pages() }
 
 # "Ask a nation's administrator for access"
 @nationbuilder.get("/mockup/oauth/authorize", status_code=_204)

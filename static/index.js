@@ -1,8 +1,9 @@
-import { reactive, html } from '@arrow-js/core'
+import { reactive, html } from '@arrow-js/core';
+import { CountryCodeMap, CountryMap } from 'country-code';
 import ArrowTags from 'arrow-tags';
 import "@lion/calendar/define";
 
-const ev = (fn, d) => ({ target: t }) => fn(d, t);
+const to_ev = fn => (...a) => ({ target: t }) => fn(t, ...a);
 const STATUS = ['unlisted', 'public'];
 const BOSTON_TIME = "US/Eastern";
 
@@ -50,6 +51,89 @@ const toMockEvent = () => {
   }  
 }
 
+const toMockPerson = (idx) => {
+  const people = [
+    ['Aleta Baun', 'F', 'ID', 'NT', 'PSI'],
+    ['Michael Chen', 'M', 'US', 'MA', ''],
+    ['Ting Liu', 'F', 'CN', 'HL', 'CCP'],
+    ['Cecilia Dada', 'F', 'NG', 'LA', 'APC'],
+    ['Aitzaz Hasan', 'M', 'PK', 'KP', ''],
+    ['Ashok Singh', 'M', 'IN', 'BR', 'JD'],
+    ['Mariana Costa', 'F', 'BR', 'SP', 'PSB']
+  ];
+  const person = people[idx%people.length];
+  const [first, last] = person[0].split(' ');
+  const email = person[0].toLowerCase().replace(' ', '_');
+  return {
+    "person": {
+      "email": `${email}@example.com`,
+      "last_name": last,
+      "first_name": first,
+      "sex": person[1],
+      "signup_type": 0,
+      "employer": '',
+      "party": person[4],
+      "registered_address": {
+        "state": person[3],
+        "country_code": person[2]
+      }
+    } 
+  }
+}
+
+const toMockBasic = (people) => {
+  let countries = "No Countries."
+  let parties = "No Parties."
+  let ids = "No People."
+  if (people.length > 0) {
+    const readers = people.map(p => new PersonReader(p, true));
+    countries = readers.reduce((o, person) => {
+      const { country, short_name } = person;
+      if (!country) return o;
+      const text = `${short_name}: ${country}`;
+      return o + `<div>${text}</div>`;
+    },"");
+    parties = readers.reduce((o, person) => {
+      const { party, short_name } = person;
+      if (!party) return o;
+      const text = `${short_name}: ${party}`;
+      return o + `<div>${text}</div>`;
+    },"");
+    ids = readers.map(person => {
+      const { id, short_name } = person;
+      const text = `${short_name}: ${id}`;
+      return `<div>${text}</div>`;
+    }).join('');
+  }
+  const style = `display: contents;`;
+  const hstyle = "grid-column: 1 / -1";
+  return [{
+    "basic_page": {
+      "name": "Page One",
+      "content": `<h3 style="${hstyle}">
+      People's Countries</h3>
+      <div style="${style}">${countries}</div>`,
+      "status": "published"
+    }
+  },{
+    "basic_page": {
+      "name": "Page Two",
+      "content": `<h3 style="${hstyle}">
+      People's Parties</h3>
+      <div style="${style}">${parties}</div>`,
+      "status": "published"
+    }
+  },{
+    "basic_page": {
+      "name": "Page Three",
+      "content": `<h3 style="${hstyle}">
+      People's IDs</h3>
+      <div style="${style}">${ids}</div>`,
+      "status": "published"
+    }
+  }]
+}
+
 const fromEventDate = (ev, key) => {
   const now = new Date();
   const k = `${key}_time`;
@@ -90,29 +174,30 @@ class T {
   static t_white = "color: #EEFFDD;";
   static t_bad = "color: rgb(96, 0, 0);";
   static t_good = "color: rgb(0, 96, 0);";
-  static b_none = "background-color: inherit;";
   static b_main = "background-color: #277125;";
-  static b_white = "background-color: #fefefe;";
-  static b_light = "background-color: #e7fbe9;";
+  static b_grey = "background-color: rgba(64,64,64,0.25);";
+  static b_9 = "background-color: rgba(255,255,255,0.99);";
+  static b_6 = "background-color: rgba(255,255,255,0.66);";
+  static b_3 = "background-color: rgba(255,255,255,0.33);";
+  static b_light = "background-color: #C7E4C8;";
   static input_field = `
     border: none;
-    font-size: 150%;
+    font-size: 110%;
+    font-weight: 500;
     line-height: 175%;
     padding: 0.25rem;
     box-sizing:border-box;
     border-radius: 0.25rem;
+    font-family: sans-serif;
   `;
   static typeface = `
     font-family: Optima, Candara, sans-serif;
   `
   static button_deselect = `
-    ${T.b_white} ${T.t_bad}
-    border-radius: 0.25rem;
-    box-shadow: 0px 0px 3px 1px rgba(0, 96, 0, 0.25),
-               -3px 5px 6px 0px rgba(0, 96, 0, 0.25);
+    ${T.b_3} ${T.t_bad}
   `;
   static button_select = `
-    ${T.b_light} color: black;
+    ${T.b_9} color: black;
     border-radius: 0.25rem;
     box-shadow: 0px 0px 3px 1px rgba(0, 96, 0, 0.25),
                -3px 5px 6px 0px rgba(0, 96, 0, 0.25);
@@ -126,14 +211,15 @@ class T {
                -3px 5px 6px 0px rgba(0, 0, 0, 0.12);
   `;
   static button_dull = `
-    cursor: auto; ${T.b_none} ${T.t_bad}
+    ${T.b_grey} ${T.t_bad}
   `;
   static button_main = `
     ${T.button_simple} ${T.b_main} ${T.t_white} 
   `;
   static status_colors = [T.t_bad, T.t_good];
   static select_colors = [
-    `${T.button_simple} ${T.b_white}, ${T.t_good}`, ''
+    `${T.button_simple} ${T.b_3} ${T.t_good}`,
+    `${T.button_simple} ${T.b_6} `,
   ];
   static center = `
     display: grid;
@@ -145,21 +231,28 @@ class T {
   `
 }
 
-const postEvent = async (data, url) => {
+const deleteAPI = async (url) => {
   return await fetch(url, {
-    method: "POST", cache: "no-cache",
+    method: "DELETE", cache: "no-cache",
+    headers: { "Content-Type": "application/json" }
+  });
+}
+
+const sendData = async (data, url, method) => {
+  return await fetch(url, {
+    method, cache: "no-cache",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data), 
+    body: JSON.stringify(data),
   })
 }
 
-const toEventForms = (name) => {
+const toTestForms = (name) => {
   if (name === "event") {
     return [[{
         legend: 'Event Info', 
-        message: '',
-        error: false,
         name: 'info', 
+        error: false,
+        message: '',
         fields: [
           { name: "name" },
           { name: "intro" },
@@ -169,9 +262,9 @@ const toEventForms = (name) => {
         ]
       }, {
         legend: `Schedule (${BOSTON_TIME})`,
-        message: '',
-        error: false,
         name: 'schedule',
+        error: false,
+        message: '',
         fields: [
           { name: "start_time" },
           { name: "end_time" },
@@ -180,38 +273,155 @@ const toEventForms = (name) => {
         ]
       }]]
   }
+  if (name === "person") {
+    return [[{
+      legend: 'Person',
+      name: 'person',
+      error: false,
+      message: '',
+      fields: [{
+        name: "first_name",
+      }, {
+        name: "last_name",
+      }, {
+        name: "country",
+        list: [...CountryCodeMap.values()]
+      }]
+    }]];
+  }
+  if (name === "basic") {
+    return [[{
+      legend: 'Basic Page',
+      name: 'basic',
+      error: false,
+      message: '',
+      fields: [{
+        name: "content"
+      }]
+    },{
+      legend: 'Basic Page',
+      name: 'basic',
+      error: false,
+      message: '',
+      fields: [{
+        name: "content"
+      }]
+    },{
+      legend: 'Basic Page',
+      name: 'basic',
+      error: false,
+      message: '',
+      fields: [{
+        name: "content"
+      }]
+    }]]
+  }
+  if (name === "survey") {
+    return [[{
+      legend: 'Survey',
+      name: 'survey',
+      error: false,
+      message: '',
+      fields: []
+    }]]
+  }
   return [];
 }
 
-const toggleEvent = (d, name, state) => {
+const toggleTest = (d, name) => {
+  d.focus = "";
   const test = d.tests[name];
-  if (!test.hidden && state !== 'on') {
+  if (!test.hidden) {
     test.hidden = true;
     test.forms = [];
     return d;
   }
   test.hidden = false;
-  test.forms = toEventForms(name);
-  return d;
+  const is_null = d.sources[name] === null;
+  const no_length = d.sources[name]?.length === 0;
+  if (!is_null && !no_length) {
+    test.forms = toTestForms(name);
+  }
+  return test;
 }
 
-const createEvent = async (cal_id, data) => {
+const updateEvent = async (d, data) => {
+  const ev_id = d.sources.event.id;
+  const url = `/api/pages/events/${ev_id}`;
+  const get_url = "/api/pages/events";
+  await sendData(data, url, 'PUT');
+  const response = await fetch(get_url);
+  const { results } = await response.json();
+  if (!results?.length) return null;
+  return results[0];
+}
+
+const createEvent = async (data) => {
   const url = "/api/pages/events";
-  await postEvent(data, url);
+  await sendData(data, url, 'POST');
   const response = await fetch(url);
   const { results } = await response.json();
   if (!results?.length) return null;
   return results[0];
 }
 
-const setMessage = (d) => {
-  const msgs = [
-    'Welcome', '欢迎大家', 'Bienvenidos', 'Вітаємо', 'স্বাগতম৷'
-  ];
-  const len = msgs.length;
-  const random = Math.floor(Math.random() * len);
-  const next = msgs.indexOf(d.msg) === random;
-  d.msg = msgs[(random + next) % len];
+const toBasicMessage = (basic) => {
+  return basic.slice(0,3).map(({id}) => id).join('-');
+}
+
+const updatePerson = async (d, data) => {
+  const who_id = d.sources.person[0].id;
+  const url = `/api/people/${who_id}`;
+  const get_url = "/api/people";
+  await sendData(data, url, 'PUT');
+  const response = await fetch(get_url);
+  const { results } = await response.json();
+  if (!results?.length) return null;
+  const basic = await createBasic(toMockBasic(results));
+  const update = toUpdater(toBasicMessage(basic));
+  d.tests.basic.forms = d.tests.basic.forms.map(update);
+  d.sources.basic = basic;
+  return results;
+}
+
+const deletePerson = async (who_id, d) => {
+  await deleteAPI(`/api/people/${who_id}`);
+  const response = await fetch('/api/people');
+  const { results } = await response.json();
+  const basic = await createBasic(toMockBasic(results));
+  const update = toUpdater(toBasicMessage(basic));
+  d.tests.basic.forms = d.tests.basic.forms.map(update);
+  d.sources.basic = basic;
+  return results || [];
+}
+
+const createPerson = async (d, data) => {
+  const url = "/api/people";
+  if (data !== null) {
+    await sendData(data, url, 'POST');
+  }
+  const response = await fetch(url);
+  const { results } = await response.json();
+  const basic = await createBasic(toMockBasic(results));
+  const update = toUpdater(toBasicMessage(basic));
+  d.tests.basic.forms = d.tests.basic.forms.map(update);
+  d.sources.basic = basic;
+  return results || [];
+}
+
+const createBasic = async (to_basic) => {
+  const data = await to_basic;
+  const url = "/api/basic_pages";
+  if (data !== null) {
+    await sendData(data[2], url, 'POST');
+    await new Promise(r => setTimeout(r, 10));
+    await sendData(data[1], url, 'POST');
+    await new Promise(r => setTimeout(r, 10));
+    await sendData(data[0], url, 'POST');
+  }
+  const response = await fetch(url);
+  const { results } = await response.json();
+  return results || [];
 }
 
 const toRoot = (nav,core) => {
@@ -229,25 +439,6 @@ const toRoot = (nav,core) => {
   };
   const { Div } = ArrowTags;
   return Div`${nav}${core}`(props);
-}
-
-const toPageNav = (fn) => {
-  const props = {
-    style: `
-      ${T.flex_fit}
-      gap: 1rem;
-      grid-row: 1;
-      display: grid;
-      grid-column: 2;
-      padding-top: 1rem;
-      padding-bottom: 1rem;
-      grid-auto-rows: auto;
-      align-content: center;
-      justify-content: center;
-    `
-  };
-  const { Div } = ArrowTags;
-  return Div`${fn}`(props);
 }
 
 const change_tz = (t0, change) => {
@@ -279,7 +470,17 @@ const toDateTime = (date, time) => {
   return iso.replace(/:..\..*/, utc);
 }
 
-const updateEvent = (cal_id, sources, entries) => {
+const formatPerson = (cal_id, sources, entries) => {
+  const p = sources.person[0] || toMockPerson().person;
+  const o = Object.fromEntries(entries);
+  const cc = CountryMap.get(o.country) || "";
+  p.registered_address.country_code = cc;
+  p.first_name = o.first_name;
+  p.last_name = o.last_name;
+  return { person: p };
+}
+
+const formatEvent = (cal_id, sources, entries) => {
   const e = sources.event || toMockEvent().event;
   const o = Object.fromEntries(entries);
   const new_schedule = true;
@@ -323,15 +524,72 @@ class EventReader {
     return this.e?.venue.name || "";
   }
   get status () {
-    return [false, true][
-      this.e?.status === STATUS[1]
-    ];
+    return this.e?.status === STATUS[1];
   }
   get intro() {
     return  this.e?.intro || "";
   }
   get name() {
     return  this.e?.name || "";
+  }
+}
+
+class PersonReader {
+  constructor(d, one) {
+    if (one) {
+      this.d = {
+        sources: {
+          person: [d]
+        }
+      }
+    }
+    else {
+      this.d = d;
+    }
+  }
+  get p() {
+    return this.d.sources.person[0] || null;
+  }
+  get id() {
+    return this.p.id || 0;
+  }
+  get party() {
+    return this.p.party || "";
+  }
+  get country_code() {
+    const { registered_address } = this.p || {};
+    return registered_address?.country_code || "";
+  }
+  get country() {
+    const { country_code } = this;
+    return CountryCodeMap.get(country_code) || "";
+  }
+  get last_name() {
+    return this.p?.last_name;
+  }
+  get first_name() {
+    return this.p?.first_name;
+  }
+  get short_name() {
+    const init = this.last_name[0].toUpperCase();
+    return `${this.first_name} ${init}.`
+  }
+}
+
+class BasicReader {
+  constructor(d, index) {
+    this.index = index;
+    this.d = d;
+  }
+  get b() {
+    const index = this.index;
+    return this.d.sources.basic[index] || null;
+  }
+  get content() {
+    return this.b?.content || "";
+  }
+  get name() {
+    return this.b?.name || "";
   }
 }
 
@@ -349,11 +607,10 @@ const toCalendar = (field) => {
   `;
 }
 
-const toField = (idx0, form, cal_id, d) => {
+const toField = (idx0, form, cal_id, reader) => {
   return (field, idx1) => {
     const key = [idx0, idx1].join('---');
-    const er = new EventReader(d);
-    const { Input, Label } = ArrowTags;
+    const { Input, Label, _ } = ArrowTags;
     if (field.name === "calendar") {
       return toCalendar(field);
     }
@@ -361,12 +618,13 @@ const toField = (idx0, form, cal_id, d) => {
       "status": "checkbox",
       "end_time": "time",
       "start_time": "time",
+      "country": "",
       "date": "date"
     }[field.name] || "text"
     const is_bool = type === "checkbox";
     const value = () => {
-      if (!(field.name in er)) return "";
-      return er[field.name];
+      if (!(field.name in reader)) return "";
+      return reader[field.name];
     }
     const lab = {
       "name": "Name",
@@ -377,6 +635,9 @@ const toField = (idx0, form, cal_id, d) => {
       "venue": "Location / Venue",
       "start_time": "Start time",
       "person": "Contact Person",
+      "first_name": "Given Name",
+      "last_name": "Surname",
+      "country": "Country"
     }[field.name];
     const for_time = ["", `
       display: grid;
@@ -385,23 +646,18 @@ const toField = (idx0, form, cal_id, d) => {
       grid-template-columns: auto 1fr;
     `][+(type === "time")];
     const for_editable = [``, `
+      ${T.b_light}
       box-shadow: 0px 0px 3px 1px rgba(0, 64, 0, 0.20) inset,
                  -3px 5px 6px 0px rgba(0, 64, 0, 0.20) inset;
     `][+!(is_bool || field.readonly)];
+    const list = field.list || null;
+    const list_id = `${key}-list`;
     const checked = value;
     const inp = Input()({
       ...field, type, value, checked,
-      "@click": (e) => {
-        const el = e.target.closest('fieldset');
-        if (el === null) return;
-        const found = form.find(f => f.name === el.name);
-        const fieldset = found || form[0];
-        fieldset.message = "";
-        fieldset.error = false;
-      },
+      ...(list ? { list : list_id } : {}),
       style: `
         ${for_time}
-        ${T.b_light}
         ${T.typeface}
         ${for_editable}
         ${T.input_field}
@@ -419,18 +675,27 @@ const toField = (idx0, form, cal_id, d) => {
     const lab_props = { 
       style: `
         ${for_checkbox}
-        font-weight: 600;
+        font-size: 120%;
         display: grid;
       `,
       html, key
     }
-    return Label(lab, inp)(lab_props);
+    const datalist = list ? toDatalist(list, list_id) : '';
+    return Label(lab, datalist, inp)(lab_props);
   }
 }
 
-const toFieldset = (cal_id, d) => {
+const toDatalist = (opts, id) => {
+  const { Option, Datalist } = ArrowTags;
+  const options = opts.map((opt, key) => {
+    return Option`${opt}`({ key, html });
+  })
+  return Datalist('', ...options)({ id: () => id });
+}
+
+const toFieldset = (cal_id, reader) => {
   return (fieldset, idx0, form) => {
-    const { Legend, Fieldset, Input, Div } = ArrowTags;
+    const { Legend, Fieldset, Input, Div, A } = ArrowTags;
     const leg_props = { 
       style: `
         font-size: 125%;
@@ -445,9 +710,12 @@ const toFieldset = (cal_id, d) => {
       `
     };
     const leg = Legend`${() => fieldset.legend}`(leg_props);
-    const fs = fieldset.fields.map(toField(idx0, form, cal_id, d));
+    const fs = fieldset.fields.map(toField(idx0, form, cal_id, reader));
+    const verb = {
+      "survey": "Submit"
+    }[fieldset.name] || "Update";
     const submit = Input()({
-      value: `Update ${fieldset.name}`,
+      value: `${verb} ${fieldset.name}`,
       name: fieldset.name,
       type: "submit",
       style: `
@@ -456,24 +724,36 @@ const toFieldset = (cal_id, d) => {
         font-size: 100%;
       `
     });
-    const footer = Div`
-    ${submit} ${() => fieldset.message}
+    const feedback = A`
+      ${() => fieldset.message}
     `({
+      href: "javascript:;",
+      name: `${fieldset.name}-feedback`,
+      "@click": (e) => {
+        fieldset.message = "";
+        fieldset.error = false;
+      },
       style: () => `
         ${T.status_colors[+!fieldset.error]}
-        grid-template-rows: 2.25rem 1fr;
+      `
+    })
+    const footer = Div`
+      ${feedback} ${submit}
+    `({
+      style: () => `
+        grid-template-rows: auto 1fr;
         grid-template-columns: 1fr;
         font-size: 1.25rem;
         font-weight: 600;
         display: grid;
-        height: 4rem;
         gap: 0.25rem;
+        height: 4rem;
       `
     });
     const props = {
       style: `
         ${T.center} ${T.flex_fit}
-        ${T.b_white} gap: 0.5rem;
+        ${T.b_9} gap: 0.5rem;
         border-radius: 0.5rem;
         padding: 0.5rem;
       `,
@@ -496,46 +776,40 @@ const validateFieldset = (cal_id, name) => {
   return true;
 }
 
-const toMainButton = (cal_id, ev_fn, d) => {
-  const props = {
-    style:  `
-      ${T.button_main}
-      height: 2em;
-      grid-column: 2;
-      max-width: 15rem;
-      cursor: pointer;
-      font-size: 1.25rem;
-      padding: 0.5rem 1rem;
-    `,
-    '@click': ev((d) => {
-        toggleEvent(d, 'event', 'on');
-        createEvent(cal_id, toMockEvent(), d).then((ev) => {
-          ev_fn(d).forms = ev_fn(d).forms.map(form => {
-            return form.map((fieldset) => {
-              return { 
-                ...fieldset,
-                message: "Reset",
-                error: true
-              };
-            });
-          });
-          d.sources.event = ev;
-        });
-    }, d) 
-  };
+const toButton = (cal_id, d) => ({ fn, props }) => {
   const { Button } = ArrowTags;
-  const fn = () => {
-    if (d.sources.event !== null) {
-      return 'Reset Event';
-    }
-    return 'New Event';
-  };
-  return Button`${fn}`(props);
+  return Button`${fn(d)}`({
+    '@click': props['@click'](cal_id, d),
+    style: `
+        ${T.button_main}
+        height: 2em;
+        cursor: pointer;
+        font-size: 1.25rem;
+        padding: 0.5rem 1rem;
+      `
+  });
 }
 
-const toForm = (cal_id, d) => {
+const toButtons = (cal_id, ev_fn, d) => {
+  return ev_fn(d).buttons.map(toButton(cal_id, d));
+}
+
+const toSectionNav = (cal_id, ev_fn, d) => {
+  const { Div } = ArrowTags;
+  const buttons = toButtons(cal_id, ev_fn, d);
+  return Div(...buttons)({
+    style: `
+      ${T.center} ${T.flex_fit}
+      display: grid;
+      grid-column: 2;
+      gap: 1.25rem;
+    `
+  });
+}
+
+const toForm = (cal_id, label, d) => {
   return (form, key) => {
-    const { Form } = ArrowTags;
+    const { Form, Div } = ArrowTags;
     const props = {
       html, key,
       style: `
@@ -548,24 +822,70 @@ const toForm = (cal_id, d) => {
         const valid = validateFieldset(cal_id, e.submitter.name);
         const found = form.find(f => f.name === e.submitter.name);
         const fieldset = found || form[0];
+        // Assign focus to the feedback
+        d.focus = `${fieldset.name}-feedback`;
+        // Check if active event
+        if (d.sources[label] === null) {
+          fieldset.message = "Unable to update";
+          fieldset.error = true;
+          return;
+        }
         const err = toErr(valid, e.submitter.name);
-        fieldset.message = [err, "Updated"][+valid];
-        fieldset.error = valid === false;
+        const updater = {
+          "event": updateEvent,
+          "person": updatePerson
+        }[label];
+        const formatter = {
+          "event": formatEvent,
+          "person": formatPerson
+        }[label];
         const entries = [...new FormData(e.target).entries()];
-        const data = updateEvent(cal_id, d.sources, entries);
-        createEvent(cal_id, data).then((ev) => {
-          d.sources.event = ev;
+        const data = formatter(cal_id, d.sources, entries);
+        fieldset.message = "...";
+        fieldset.error = false;
+        updater(d, data).then((ev) => {
+          d.sources[label] = ev;
+          setTimeout(() => {
+            fieldset.message = [err, `Updated ${label}`][+valid];
+            fieldset.error = valid === false;
+          }, 50);
+        }).catch(() => {
+          fieldset.message = "Unable to update";
+          fieldset.error = true;
         });
         e.preventDefault();
       }
     }
-    const fs = form.map(toFieldset(cal_id, d));
+    const reader = {
+      "event": new EventReader(d),
+      "person": new PersonReader(d),
+      "basic": (index) => new BasicReader(d, index),
+      "survey": new PersonReader(d)
+    }[label];
+    if (label === "basic") {
+      const content0 = reader(0).content;
+      const content1 = reader(1).content;
+      const content2 = reader(2).content;
+      return Div`
+        ${content0} ${content1} ${content2}
+      `({
+        html, key, style: `
+          ${T.center} ${T.flex_fit}
+          grid-column: 1 / -1;
+          padding: 1rem;
+          display: grid;
+          gap: 0.25rem;
+        `
+      });
+    }
+    const fs = form.map(toFieldset(cal_id, reader));
     return Form(...fs)(props);
   }
 }
 
 const toSection = (pre, cal_id, d) => {
-  return ([h2, ev_fn], idx) => {
+  return ([h2, label], idx) => {
+    const ev_fn = () => d.tests[label];
     const styles = T.select_colors;
     const { Div, H2 } = ArrowTags;
     const show = () => !ev_fn(d).hidden;
@@ -573,6 +893,7 @@ const toSection = (pre, cal_id, d) => {
       return `
         display: grid;
         gap: 0.5rem 0;
+        padding: 0.25rem;
         pointer-events: all;
         grid-template-columns: auto 1fr;
       `+styles[+show()];
@@ -584,7 +905,7 @@ const toSection = (pre, cal_id, d) => {
     const h2_props = {
       style: `margin: 0; padding-left: 0.5rem; cursor: pointer;`,
       '@click': (e) => {
-        toggleEvent(d, ev_fn(d).name);
+        toggleTest(d, ev_fn(d).name);
       }
     };
     const toggle = Div((d) => {
@@ -599,26 +920,28 @@ const toSection = (pre, cal_id, d) => {
         padding: 0.3rem 0.5rem 0.5rem 0.5rem;
       ` + [T.button_main, T.button_deselect][+show()],
       '@click': (e) => {
-        toggleEvent(d, 'event');
+        toggleTest(d, ev_fn(d).name);
       }
     });
-    const forms = ev_fn(d).forms.map(toForm(cal_id, d));
-    if (forms.length === 0) {
+    const forms = ev_fn(d).forms.map(toForm(cal_id, label, d));
+    if (ev_fn(d).hidden) {
       return Div(toggle, H2(h2)(h2_props))(props);
     }
-    const main_button = toMainButton(cal_id, ev_fn, d);
+    const nav = toSectionNav(cal_id, ev_fn, d);
     return Div(
-      toggle, H2(h2)(h2_props), main_button, ...forms
+      toggle, H2(h2)(h2_props), nav, ...forms
     )(props);
   }
 }
 
 const toSectionsPrefix = (d) => {
-  return [...Object.values(d.tests)].map(test => {
-    return [+v.hidden].concat(v.forms.map(f => {
-      return f.map(fs => fs.message).join('-');
-    })).join('--');
-  }).join('-');
+  return [...Object.values(d.tests)].map(v => {
+    return JSON.stringify(
+      [+v.hidden].concat(v.forms.map(f => {
+        return f.map(fs => fs.message);
+      }))
+    );
+  }).join(' ');
 }
 
 const toSections = (cal_id) => {
@@ -626,18 +949,10 @@ const toSections = (cal_id) => {
     const pre = toSectionsPrefix(d);
     const prefix = 'API Endpoint: ';
     const labels = [...Object.entries({
-      "Events": () => {
-        return d.tests.event;
-      },
-      "People": () => {
-        return d.tests.person;
-      },
-      "Sites + People": () => {
-        return d.tests.basic;
-      },
-      "Surveys + Contact": () => {
-        return d.tests.survey;
-      }
+      "Events": "event",
+      "People": "person",
+      "Sites + People": "basic",
+      "Surveys + Contact": "survey" 
     })];
     return labels.map(([k,v]) => {
       return [prefix+k, v];
@@ -652,63 +967,146 @@ const toPageCore = (fn) => {
       grid-row: 3;
       grid-column: 2;
       display: grid;
+      padding-top: 1rem;
       gap: 0.5rem;
     `
   }
   return Div`${fn}`(props);
 }
 
-const toNavItems = (pre, cal_id, d) => {
-  const out = [[
-      () => `${d.msg}, ${d.n} pages!`,
-      { '@click': ev(setMessage, d) }
-    ]
-  ];
-  return out.map(toNavItem(pre));
+const toUpdater = (message) => {
+  return form => {
+    return form.map((fieldset) => {
+      return { ...fieldset, message, error: false };
+    });
+  }
 }
 
-const toNavItem = (prefix) => {
-  return ([fn, opts], idx) => {
-    const key = `${prefix}-${idx}`;
-    const style = `
-      ${T.button_main}
-      height: 2em;
-      font-size: 1.25rem;
-      padding: 0.5rem 1rem;
-    `;
-    const props = { ...opts, html, style, key };
-    const { Button } = ArrowTags;
-    return Button`${fn}`(props);
-  }
+const toDefaultPerson = (name) => {
+  const info = "Latest Person";
+  const buttons = [{
+    props: {
+      '@click': to_ev((_, cal_id, d) => {
+          d.focus = "";
+          const test = d.tests.person;
+          test.forms = toTestForms('person');
+          createPerson(d, null).then((people) => {
+            return createPerson(d, toMockPerson(people.length));
+          }).then((people) => {
+            const new_id = people[0]?.id || 0;
+            const update = toUpdater(`Created Person #${new_id}`);
+            d.tests.person.forms = d.tests.person.forms.map(update);
+            d.sources.person = people;
+          });
+      })
+    },
+    fn: d => () => {
+      return 'New Person';
+    }
+  },{
+    props: {
+      '@click': to_ev((_, cal_id, d) => {
+          d.focus = "";
+          const test = d.tests.person;
+          const source = d.sources.person;
+          const old_id = source[0]?.id || 0;
+          test.forms = toTestForms('person');
+          if (test.length === 0) {
+            throw new Error('No Person to Delete');
+          }
+          deletePerson(old_id, d).then((people) => {
+            const update = toUpdater(`Deleted Person #${old_id}`);
+            d.tests.person.forms = d.tests.person.forms.map(update);
+            d.sources.person = people;
+          });
+      })
+    },
+    fn: d => () => {
+      return 'Delete Person';
+    }
+  }];
+  return {
+    name, info, buttons, forms: [], hidden: true
+  };
+}
+
+const toDefaultBasic = (name) => {
+  const info = "Basic Pages";
+  const buttons = [{
+    props: {
+      '@click': to_ev((_, cal_id, d) => {
+          d.focus = "";
+          const test = d.tests.basic;
+          test.forms = toTestForms('basic');
+          createPerson(d, null);
+      })
+    },
+    fn: d => () => {
+      return 'Create 3 Pages';
+    }
+  }];
+  return {
+    name, info, buttons, forms: [], hidden: true
+  };
+}
+
+const toDefaultSurvey = (name) => {
+  const info = "Survey";
+  const buttons = [{
+    props: {
+      '@click': to_ev((_, cal_id, d) => {
+          d.focus = "";
+          const test = d.tests.survey;
+          test.forms = toTestForms('survey');
+      })
+    },
+    fn: d => () => {
+      return 'Create Survey';
+    }
+  }];
+  return {
+    name, info, buttons, forms: [], hidden: true
+  };
 }
 
 const toDefaultEvent = (name) => {
   const info = "Latest Event";
+  const buttons = [{
+    props: {
+      '@click': to_ev((_, cal_id, d) => {
+          d.focus = "";
+          const test = d.tests.event;
+          test.forms = toTestForms('event');
+          createEvent(toMockEvent()).then((ev) => {
+            const update = toUpdater(`Created Event #${ev.id}`);
+            d.tests.event.forms = d.tests.event.forms.map(update);
+            d.sources.event = ev;
+          });
+      })
+    },
+    fn: d => () => 'New Event'
+  }];
   return {
-    name, info, forms: [], hidden: true
+    name, info, buttons, forms: [], hidden: true
   };
 }
 const toDefault = () => {
   return {
     n: -1,
     msg: 'Welcome',
-    who: 'John',
     sources: {
       event: null,
+      basic: [],
+      person: []
     },
+    focus: '',
     tests: {
       event: toDefaultEvent('event'),
-      person: toDefaultEvent('person'),
-      basic: toDefaultEvent('basic'),
-      survey: toDefaultEvent('survey')
+      person: toDefaultPerson('person'),
+      basic: toDefaultBasic('basic'),
+      survey: toDefaultSurvey('survey')
     }
   }
-}
-
-const toPages = async (d) =>  {
-  const response = await fetch("/api/pages/basic_pages");
-  const { results } = await response.json();
-  d.n = results.length;
 }
 
 const updateDateInput = (e) => {
@@ -757,12 +1155,18 @@ const observe = (d, id1, id2) => {
         ${T.button_select}
       }
       .calendar__navigation {
-        ${T.center}
-        ${T.flex_fit}
+        ${T.center} ${T.flex_fit}
         grid-gap: 0.5rem;
       }
     `;
     root.appendChild(style);
+    // Refocus form element
+    const el = document.getElementsByName(d.focus)[0];
+    if (el === undefined) return;
+    setTimeout(() => {
+      el.setAttribute('tabindex', '0');
+      el.focus();
+    }, 0);
   }).observe(el, { subtree: true, childList: true });
 }
 
@@ -772,15 +1176,9 @@ const main = () => {
   const data = reactive(toDefault());
   observe(data, id, cal_id);
   const { render } = ArrowTags;
-  const toLabel = d => {
-   return toNavItems('test', cal_id, d);
-  }
-  const nav = toPageNav(toLabel);
   const core = toPageCore(toSections(cal_id));
-  const root = toRoot(nav, core);
+  const root = toRoot(core);
   render(id, html, data, root);
-  toPages(data);
-
 }
 
 export default main

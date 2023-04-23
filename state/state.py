@@ -1,5 +1,7 @@
 from pydantic import BaseSettings
 from typing import Dict, List
+from models import HasBasicPage
+from models import HasPerson
 from models import HasEvent
 from threading import Lock
 from pathlib import Path
@@ -9,15 +11,19 @@ import os
 class Session(BaseSettings):
     token: str
 
+class BasicPages(BaseSettings):
+    basic_pages: List[HasBasicPage]
+
+class Persons(BaseSettings):
+    persons: List[HasPerson]
+
 class Events(BaseSettings):
     events: List[HasEvent]
 
-class Pages(BaseSettings):
-    pages: List[Dict[str, str]]
-
 TYPES = {
-    "pages": Pages,
     "events": Events,
+    "persons": Persons,
+    "basic_pages": BasicPages,
     "session": Session
 }
 LOCKS = { k: Lock() for k in TYPES.keys() }
@@ -34,7 +40,10 @@ def to_state(key):
     if not os.path.exists(filename):
         return None
     with open(filename, 'r') as f:
-        return TYPES[key](**json.loads(f.read()))
+        try:
+            return TYPES[key](**json.loads(f.read()))
+        except json.JSONDecodeError:
+            return TYPES[key](events=[])
 
 def set_state(key, **kwargs):
     lock = to_lock(key)
