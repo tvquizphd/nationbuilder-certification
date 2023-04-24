@@ -51,6 +51,48 @@ const toMockEvent = () => {
   }  
 }
 
+const toMockSurvey = (idx) => {
+  const surveys = [[
+    "Are you satisfied with your current working conditions?", 
+    "Do you work more hours per week on average than you would like?",
+    "Does your income securely cover your food, housing, and healthcare?",
+    "Do you believe your government represents you and advocates for you?"
+  ], [
+    "Do you avoid fossil fuel use, plastic waste, or animal consumption?",
+    "Are you concerned about global climate change's impact in your area?",
+    "Would you support policies designed to reduce the use of fossil fuels?",
+    "Would you support policies to subsidize renewable energy production?",
+    "Are you willing to pay higher income tax to subsidize renewable energy?"
+  ], [ 
+    "Do you often face discrimination by your race or ethnicity?",
+    "Do you often face discrimination by your gender or sexuality?",
+    "Do you often face discrimination by disability or health issues?",
+    "Would you support laws penalizing employers for discrimination?",
+    "Do you believe your government allows discriminatory policies?"
+  ]];
+  const survey = surveys[idx%surveys.length];
+  const question = {
+    "type": "multiple",
+    "status": "published",
+    "choices": [{name: "no" }, {name: "yes"}]
+  }
+  return {
+    "survey": {
+      "slug": `survey-${idx}`,
+      "name": `Survey ${idx}`,
+      "tags": ["political"],
+      "status":"published",
+      "questions": survey.map((text, i) => {
+        return {
+          ...question,
+          "prompt": text,
+          "slug": `survey-${idx}-${i}`
+        }
+      })
+    }
+  }
+}
+
 const toMockPerson = (idx) => {
   const people = [
     ['Aleta Baun', 'F', 'ID', 'NT', 'PSI'],
@@ -89,21 +131,19 @@ const toMockBasic = (people) => {
     const readers = people.map(p => new PersonReader(p, true));
     countries = readers.reduce((o, person) => {
       const { country, short_name } = person;
-      if (!country) return o;
-      const text = `${short_name}: ${country}`;
+      const text = `${short_name}: ${country || 'unknown'}`;
       return o + `<div>${text}</div>`;
     },"");
     parties = readers.reduce((o, person) => {
       const { party, short_name } = person;
-      if (!party) return o;
-      const text = `${short_name}: ${party}`;
+      const text = `${short_name}: ${party || 'unknown'}`;
       return o + `<div>${text}</div>`;
     },"");
-    ids = readers.map(person => {
+    ids = readers.reduce((o, person) => {
       const { id, short_name } = person;
       const text = `${short_name}: ${id}`;
-      return `<div>${text}</div>`;
-    }).join('');
+      return o + `<div>${text}</div>`;
+    },"");
   }
   const style = `display: contents;`;
   const hstyle = "grid-column: 1 / -1";
@@ -316,15 +356,6 @@ const toTestForms = (name) => {
       }]
     }]]
   }
-  if (name === "survey") {
-    return [[{
-      legend: 'Survey',
-      name: 'survey',
-      error: false,
-      message: '',
-      fields: []
-    }]]
-  }
   return [];
 }
 
@@ -369,6 +400,13 @@ const toBasicMessage = (basic) => {
   return basic.slice(0,3).map(({id}) => id).join('-');
 }
 
+const createSurveyContact = async (d, data) => {
+  const who_id = d.sources.person[0]?.id || 0;
+  const url = `/api/people/${who_id}/contacts`;
+  await sendData(data, url, 'POST');
+  return d.sources.survey;
+}
+
 const updatePerson = async (d, data) => {
   const who_id = d.sources.person[0].id;
   const url = `/api/people/${who_id}`;
@@ -406,6 +444,16 @@ const createPerson = async (d, data) => {
   const update = toUpdater(toBasicMessage(basic));
   d.tests.basic.forms = d.tests.basic.forms.map(update);
   d.sources.basic = basic;
+  return results || [];
+}
+
+const createSurvey = async (d, data) => {
+  const url = "/api/surveys";
+  if (data !== null) {
+    await sendData(data, url, 'POST');
+  }
+  const response = await fetch(url);
+  const { results } = await response.json();
   return results || [];
 }
 
@@ -468,6 +516,27 @@ const toDateTime = (date, time) => {
   const iso = loc.toISOString();
   const utc = '-00:00';
   return iso.replace(/:..\..*/, utc);
+}
+
+const formatSurveyContact = (fieldset) => {
+  return (cal_id, sources, entries) => {
+    const who_id = sources.person[0]?.id || 0;
+    const o = Object.fromEntries(entries);
+    const checked_boxes = [...Object.keys(o)];
+    const query = fieldset.legend;
+    const target = fieldset.fields.map(f => f.name)[0];
+    const is_yes = !!checked_boxes.find(k => k === target);
+    const note = [query, ['NO', 'YES'][+is_yes]].join(' ');
+    const c = {
+      "type_id": 2,
+      "note": note,
+      "sender_id": who_id,
+      "person_id": who_id,
+      "method": "other",
+      "status": "answered"
+    }
+    return { contact: c };
+  }
 }
 
 const formatPerson = (cal_id, sources, entries) => {
@@ -565,10 +634,10 @@ class PersonReader {
     return CountryCodeMap.get(country_code) || "";
   }
   get last_name() {
-    return this.p?.last_name;
+    return this.p?.last_name || "";
   }
   get first_name() {
-    return this.p?.first_name;
+    return this.p?.first_name || "";
   }
   get short_name() {
     const init = this.last_name[0].toUpperCase();
@@ -593,6 +662,26 @@ class BasicReader {
   }
 }
 
+class SurveyReader {
+  constructor(d, index) {
+    this.index = index;
+    this.d = d;
+  }
+  get s() {
+    return this.d.sources.survey[0] || null;
+  }
+  get name() {
+    return this.s?.name || "";
+  }
+  get questions() {
+    return this.s?.questions || [];
+  }
+  get prompt() {
+    const q = this.questions[this.index] || null;
+    return q?.prompt || '';
+  }
+}
+
 const toCalendar = (field) => {
   const style = `
     grid-column-start: 1;
@@ -607,14 +696,15 @@ const toCalendar = (field) => {
   `;
 }
 
-const toField = (idx0, form, cal_id, reader) => {
+const toField = (idx0, form, cal_id, to_reader) => {
   return (field, idx1) => {
+    const reader = to_reader(idx1);
     const key = [idx0, idx1].join('---');
     const { Input, Label, _ } = ArrowTags;
     if (field.name === "calendar") {
       return toCalendar(field);
     }
-    const type = {
+    const type = field.type || {
       "status": "checkbox",
       "end_time": "time",
       "start_time": "time",
@@ -623,10 +713,13 @@ const toField = (idx0, form, cal_id, reader) => {
     }[field.name] || "text"
     const is_bool = type === "checkbox";
     const value = () => {
+      if ('value' in field) {
+        return field.value();
+      }
       if (!(field.name in reader)) return "";
       return reader[field.name];
     }
-    const lab = {
+    const lab = field.label || {
       "name": "Name",
       "intro": "Intro",
       "status": "Published",
@@ -653,9 +746,13 @@ const toField = (idx0, form, cal_id, reader) => {
     const list = field.list || null;
     const list_id = `${key}-list`;
     const checked = value;
+    const for_click = field['@click'] ? {
+      '@click': field['@click']
+    } : {};
     const inp = Input()({
       ...field, type, value, checked,
       ...(list ? { list : list_id } : {}),
+      ...for_click,
       style: `
         ${for_time}
         ${T.typeface}
@@ -693,7 +790,7 @@ const toDatalist = (opts, id) => {
   return Datalist('', ...options)({ id: () => id });
 }
 
-const toFieldset = (cal_id, reader) => {
+const toFieldset = (cal_id, to_reader) => {
   return (fieldset, idx0, form) => {
     const { Legend, Fieldset, Input, Div, A } = ArrowTags;
     const leg_props = { 
@@ -710,12 +807,10 @@ const toFieldset = (cal_id, reader) => {
       `
     };
     const leg = Legend`${() => fieldset.legend}`(leg_props);
-    const fs = fieldset.fields.map(toField(idx0, form, cal_id, reader));
-    const verb = {
-      "survey": "Submit"
-    }[fieldset.name] || "Update";
+    const fs = fieldset.fields.map(toField(idx0, form, cal_id, to_reader));
+    const verb = fieldset.verb ? fieldset.verb() : "Update";
     const submit = Input()({
-      value: `${verb} ${fieldset.name}`,
+      value: () => `${verb} ${fieldset.name}`,
       name: fieldset.name,
       type: "submit",
       style: `
@@ -819,9 +914,11 @@ const toForm = (cal_id, label, d) => {
         gap: 1.25rem;
       `,
       "@submit": (e) => {
+        e.preventDefault();
         const valid = validateFieldset(cal_id, e.submitter.name);
         const found = form.find(f => f.name === e.submitter.name);
-        const fieldset = found || form[0];
+        const fieldset = found || null;
+        if (fieldset === null) return;
         // Assign focus to the feedback
         d.focus = `${fieldset.name}-feedback`;
         // Check if active event
@@ -833,34 +930,38 @@ const toForm = (cal_id, label, d) => {
         const err = toErr(valid, e.submitter.name);
         const updater = {
           "event": updateEvent,
-          "person": updatePerson
+          "person": updatePerson,
+          "survey": createSurveyContact,
         }[label];
         const formatter = {
           "event": formatEvent,
-          "person": formatPerson
+          "person": formatPerson,
+          "survey": formatSurveyContact(fieldset)
         }[label];
         const entries = [...new FormData(e.target).entries()];
         const data = formatter(cal_id, d.sources, entries);
         fieldset.message = "...";
         fieldset.error = false;
+        const updated = {
+          "survey": "Stored this answer",
+        }[label] || `Updated ${label}`; 
         updater(d, data).then((ev) => {
           d.sources[label] = ev;
           setTimeout(() => {
-            fieldset.message = [err, `Updated ${label}`][+valid];
+            fieldset.message = [err, updated][+valid];
             fieldset.error = valid === false;
-          }, 50);
+          }, 10);
         }).catch(() => {
           fieldset.message = "Unable to update";
           fieldset.error = true;
         });
-        e.preventDefault();
       }
     }
     const reader = {
-      "event": new EventReader(d),
-      "person": new PersonReader(d),
+      "event": () => new EventReader(d),
+      "person": () => new PersonReader(d),
       "basic": (index) => new BasicReader(d, index),
-      "survey": new PersonReader(d)
+      "survey": (index) => new SurveyReader(d, index)
     }[label];
     if (label === "basic") {
       const content0 = reader(0).content;
@@ -935,13 +1036,17 @@ const toSection = (pre, cal_id, d) => {
 }
 
 const toSectionsPrefix = (d) => {
-  return [...Object.values(d.tests)].map(v => {
+  const answers = Object.entries(d.sources.answer).map(([k,v])=> {
+    return [k, k.toUpperCase()][+v];
+  });
+  const tests = [...Object.values(d.tests)].map(v => {
     return JSON.stringify(
       [+v.hidden].concat(v.forms.map(f => {
         return f.map(fs => fs.message);
       }))
     );
-  }).join(' ');
+  });
+  return [...tests, ...answers].join('-');
 }
 
 const toSections = (cal_id) => {
@@ -1009,6 +1114,7 @@ const toDefaultPerson = (name) => {
           d.focus = "";
           const test = d.tests.person;
           const source = d.sources.person;
+          if (source.length === 0) return;
           const old_id = source[0]?.id || 0;
           test.forms = toTestForms('person');
           if (test.length === 0) {
@@ -1016,8 +1122,13 @@ const toDefaultPerson = (name) => {
           }
           deletePerson(old_id, d).then((people) => {
             const update = toUpdater(`Deleted Person #${old_id}`);
-            d.tests.person.forms = d.tests.person.forms.map(update);
             d.sources.person = people;
+            if (people.length === 0) {
+              d.tests.person.forms = [];
+            }
+            else {
+              d.tests.person.forms = d.tests.person.forms.map(update);
+            }
           });
       })
     },
@@ -1056,12 +1167,47 @@ const toDefaultSurvey = (name) => {
     props: {
       '@click': to_ev((_, cal_id, d) => {
           d.focus = "";
-          const test = d.tests.survey;
-          test.forms = toTestForms('survey');
+          d.tests.survey.forms = [];
+          createSurvey(d, null).then((survey) => {
+            return createSurvey(d, toMockSurvey(survey.length));
+          }).then((survey) => {
+            const new_id = survey[0]?.id || 0;
+            const questions = survey[0]?.questions || [];
+            const _form = questions.map(({slug, prompt: p}, i) => {
+              return {
+                name: `Question ${i}`,
+                legend: p || '',
+                verb: () => {
+                  const { answer } = d.sources;
+                  const checked = answer[slug] || false;
+                  return ['No', 'Yes'][+checked] + ' to';
+                },
+                fields: [{
+                  name: slug,
+                  type: "checkbox",
+                  label: "Please Answer",
+                  value: () => {
+                    const { answer } = d.sources;
+                    return !!(answer[slug] || false);
+                  },
+                  '@click': (e) => {
+                    const { answer } = d.sources;
+                    const checked = answer[slug] || false;
+                    d.sources.answer[slug] = !checked;
+                  }
+                }],
+                error: false,
+                message: ''
+              }
+            });
+            const update = toUpdater(`Created Survey #${new_id}`);
+            d.tests.survey.forms = [_form].map(update);
+            d.sources.survey = survey;
+          });
       })
     },
     fn: d => () => {
-      return 'Create Survey';
+      return 'New Survey';
     }
   }];
   return {
@@ -1096,6 +1242,8 @@ const toDefault = () => {
     msg: 'Welcome',
     sources: {
       event: null,
+      answer: {},
+      survey: [],
       basic: [],
       person: []
     },

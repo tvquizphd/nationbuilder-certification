@@ -1,6 +1,8 @@
 from pydantic import BaseSettings
 from typing import Dict, List
 from models import HasBasicPage
+from models import HasContact
+from models import HasSurvey
 from models import HasPerson
 from models import HasEvent
 from threading import Lock
@@ -14,6 +16,12 @@ class Session(BaseSettings):
 class BasicPages(BaseSettings):
     basic_pages: List[HasBasicPage]
 
+class Surveys(BaseSettings):
+    surveys: List[HasSurvey]
+
+class Contacts(BaseSettings):
+    contacts: List[HasContact]
+
 class Persons(BaseSettings):
     persons: List[HasPerson]
 
@@ -23,6 +31,8 @@ class Events(BaseSettings):
 TYPES = {
     "events": Events,
     "persons": Persons,
+    "surveys": Surveys,
+    "contacts": Contacts,
     "basic_pages": BasicPages,
     "session": Session
 }

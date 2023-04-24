@@ -13,6 +13,8 @@ from fastapi import Depends, FastAPI
 from urllib.parse import parse_qs
 from pydantic import BaseModel
 from models import HasBasicPage
+from models import HasContact
+from models import HasSurvey
 from models import HasPerson
 from models import HasEvent
 import requests
@@ -118,6 +120,28 @@ def list_persons(config=Depends(to_config), token=to_token()):
     return to_service(config).get_api(to_token(), '/people')
 
 '''
+Survey
+'''
+
+@nationbuilder.post("/api/surveys", status_code=_201)
+async def create_survey(
+        e: HasSurvey, config=Depends(to_config), token=to_token()
+    ):
+    async def post_survey():
+        url = '/sites/foobar-fake-site/pages/surveys'
+        data = json.loads(e.json())
+        await to_service(config).post_api(to_token(), url, data)
+    # Submit request in parallel
+    pool.submit(asyncio.run, post_survey())
+
+
+@nationbuilder.get("/api/surveys")
+def list_surveys(config=Depends(to_config), token=to_token()):
+    url = '/sites/foobar-fake-site/pages/surveys'
+    return to_service(config).get_api(to_token(), url)
+
+
+'''
 Basic Page
 '''
 
@@ -136,6 +160,22 @@ async def create_basic_page(
 def list_basic_pages(config=Depends(to_config), token=to_token()):
     url = '/sites/foobar-fake-site/pages/basic_pages'
     return to_service(config).get_api(to_token(), url)
+
+
+'''
+Contact
+'''
+
+@nationbuilder.post("/api/people/{who}/contacts", status_code=_201)
+async def create_contact(
+        who: int, e: HasContact, config=Depends(to_config), token=to_token()
+    ):
+    async def post_contact():
+        url = f'/people/{who}/contacts'
+        data = json.loads(e.json())
+        await to_service(config).post_api(to_token(), url, data)
+    # Submit request in parallel
+    pool.submit(asyncio.run, post_contact())
 
 
 '''
@@ -210,6 +250,21 @@ async def _create_basic_page(request: Request):
     set_state('basic_pages', basic_pages=[basic_page, *basic_pages])
 
 '''
+Contact, mocked
+'''
+
+def to_contacts():
+    contacts = to_state("contacts")
+    if contacts is None: return []
+    return contacts.contacts
+
+@nationbuilder.post("/mockup/api/v1/people/{who}/contacts", status_code=_201)
+async def _create_contact(who: int, request: Request):
+    contact = json.loads((await request.body()).decode('utf-8'))
+    contacts = [e.dict() for e in to_contacts()]
+    set_state('contacts', contacts=[contact, *contacts])
+
+'''
 Person, mocked
 '''
 
@@ -252,6 +307,28 @@ async def _create_person(request: Request):
 def _list_persons(format: str):
     results = [e.person for e in to_persons()] 
     return { "results": results }
+
+'''
+Survey, mocked
+'''
+
+def to_surveys():
+    surveys = to_state("surveys")
+    if surveys is None: return []
+    return surveys.surveys
+
+@nationbuilder.post("/mockup/api/v1/sites/{site}/pages/surveys", status_code=_201)
+async def _create_survey(request: Request):
+    survey = json.loads((await request.body()).decode('utf-8'))
+    surveys = [e.dict() for e in to_surveys()]
+    survey["survey"]["id"] = len(surveys)
+    set_state('surveys', surveys=[survey, *surveys])
+
+@nationbuilder.get("/mockup/api/v1/sites/{site}/pages/surveys")
+def _list_surveys(format: str):
+    results = [e.survey for e in to_surveys()] 
+    return { "results": results }
+
 
 '''
 Event, mocked
