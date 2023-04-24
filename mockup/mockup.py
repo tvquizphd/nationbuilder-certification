@@ -83,13 +83,6 @@ async def delete_person(
     async def delete_person():
         url = f'/people/{who}'
         await to_service(config).delete_api(to_token(), url)
-    # TODO Fix: 404 only works locally!
-    try:
-        persons = [e.dict() for e in to_persons()]
-        next(e for e in persons if is_who(e, who))
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=404, detail="No such person")
     # Submit request in parallel
     pool.submit(asyncio.run, delete_person())
 
