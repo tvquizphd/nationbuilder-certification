@@ -1,6 +1,6 @@
 import { reactive, html } from '@arrow-js/core';
 import { CountryCodeMap, CountryMap } from 'country-code';
-import ArrowTags from 'arrow-tags';
+import { arrowTags } from 'arrow-tags';
 import "@lion/calendar/define";
 
 const to_ev = fn => (...a) => ({ target: t }) => fn(t, ...a);
@@ -48,12 +48,12 @@ const toMockEvent = () => {
         }
       }
     }
-  }  
+  }
 }
 
 const toMockSurvey = (idx) => {
   const surveys = [[
-    "Are you satisfied with your current working conditions?", 
+    "Are you satisfied with your current working conditions?",
     "Do you work more hours per week on average than you would like?",
     "Does your income securely cover your food, housing, and healthcare?",
     "Do you believe your government represents you and advocates for you?"
@@ -63,7 +63,7 @@ const toMockSurvey = (idx) => {
     "Would you support policies designed to reduce the use of fossil fuels?",
     "Would you support policies to subsidize renewable energy production?",
     "Are you willing to pay higher income tax to subsidize renewable energy?"
-  ], [ 
+  ], [
     "Do you often face discrimination by your race or ethnicity?",
     "Do you often face discrimination by your gender or sexuality?",
     "Do you often face discrimination by disability or health issues?",
@@ -119,7 +119,7 @@ const toMockPerson = (idx) => {
         "state": person[3],
         "country_code": person[2]
       }
-    } 
+    }
   }
 }
 
@@ -187,7 +187,7 @@ const setLitDate = (root, ev) => {
   root.host.__focusedDate = date;
   root.host.selectedDate = date;
   root.host.centralDate = date;
-  const detail = { 
+  const detail = {
     selectedDate: date
   }
   root.host.dispatchEvent(
@@ -254,7 +254,7 @@ class T {
     ${T.b_grey} ${T.t_bad}
   `;
   static button_main = `
-    ${T.button_simple} ${T.b_main} ${T.t_white} 
+    ${T.button_simple} ${T.b_main} ${T.t_white}
   `;
   static status_colors = [T.t_bad, T.t_good];
   static select_colors = [
@@ -289,8 +289,8 @@ const sendData = async (data, url, method) => {
 const toTestForms = (name) => {
   if (name === "event") {
     return [[{
-        legend: 'Event Info', 
-        name: 'info', 
+        legend: 'Event Info',
+        name: 'info',
         error: false,
         message: '',
         fields: [
@@ -472,7 +472,7 @@ const createBasic = async (to_basic) => {
   return results || [];
 }
 
-const toRoot = (nav,core) => {
+const toRoot = (core) => {
   const props = {
     style: `
       ${T.typeface}
@@ -485,8 +485,8 @@ const toRoot = (nav,core) => {
       grid-template-rows: 1fr auto;
     `
   };
-  const { Div } = ArrowTags;
-  return Div`${nav}${core}`(props);
+  const { Div } = arrowTags(html);
+  return Div`${core}`(props);
 }
 
 const change_tz = (t0, change) => {
@@ -700,7 +700,7 @@ const toField = (idx0, form, cal_id, to_reader) => {
   return (field, idx1) => {
     const reader = to_reader(idx1);
     const key = [idx0, idx1].join('---');
-    const { Input, Label, _ } = ArrowTags;
+    const { Input, Label } = arrowTags(html);
     if (field.name === "calendar") {
       return toCalendar(field);
     }
@@ -769,13 +769,13 @@ const toField = (idx0, form, cal_id, to_reader) => {
         grid-template-columns: 1fr 1fr;
       `
     ][+is_bool];
-    const lab_props = { 
+    const lab_props = {
       style: `
         ${for_checkbox}
         font-size: 120%;
         display: grid;
       `,
-      html, key
+      key
     }
     const datalist = list ? toDatalist(list, list_id) : '';
     return Label(lab, datalist, inp)(lab_props);
@@ -783,17 +783,17 @@ const toField = (idx0, form, cal_id, to_reader) => {
 }
 
 const toDatalist = (opts, id) => {
-  const { Option, Datalist } = ArrowTags;
+  const { Option, Datalist } = arrowTags(html);
   const options = opts.map((opt, key) => {
-    return Option`${opt}`({ key, html });
+    return Option`${opt}`({ key });
   })
   return Datalist('', ...options)({ id: () => id });
 }
 
 const toFieldset = (cal_id, to_reader) => {
   return (fieldset, idx0, form) => {
-    const { Legend, Fieldset, Input, Div, A } = ArrowTags;
-    const leg_props = { 
+    const { Legend, Fieldset, Input, Div, A } = arrowTags(html);
+    const leg_props = {
       style: `
         font-size: 125%;
         height: 1.5rem;
@@ -853,7 +853,7 @@ const toFieldset = (cal_id, to_reader) => {
         padding: 0.5rem;
       `,
       name: fieldset.name,
-      html, key: idx0 
+      key: idx0
     }
     return Fieldset(leg, ...fs, footer)(props);
   }
@@ -872,7 +872,7 @@ const validateFieldset = (cal_id, name) => {
 }
 
 const toButton = (cal_id, d) => ({ fn, props }) => {
-  const { Button } = ArrowTags;
+  const { Button } = arrowTags(html);
   return Button`${fn(d)}`({
     '@click': props['@click'](cal_id, d),
     style: `
@@ -890,7 +890,7 @@ const toButtons = (cal_id, ev_fn, d) => {
 }
 
 const toSectionNav = (cal_id, ev_fn, d) => {
-  const { Div } = ArrowTags;
+  const { Div } = arrowTags(html);
   const buttons = toButtons(cal_id, ev_fn, d);
   return Div(...buttons)({
     style: `
@@ -904,9 +904,9 @@ const toSectionNav = (cal_id, ev_fn, d) => {
 
 const toForm = (cal_id, label, d) => {
   return (form, key) => {
-    const { Form, Div } = ArrowTags;
+    const { Form, Div } = arrowTags(html);
     const props = {
-      html, key,
+      key,
       style: `
         grid-column: 1 / -1;
         padding-top: 1rem;
@@ -944,7 +944,7 @@ const toForm = (cal_id, label, d) => {
         fieldset.error = false;
         const updated = {
           "survey": "Stored this answer",
-        }[label] || `Updated ${label}`; 
+        }[label] || `Updated ${label}`;
         updater(d, data).then((ev) => {
           d.sources[label] = ev;
           setTimeout(() => {
@@ -970,7 +970,7 @@ const toForm = (cal_id, label, d) => {
       return Div`
         ${content0} ${content1} ${content2}
       `({
-        html, key, style: `
+        key, style: `
           ${T.center} ${T.flex_fit}
           grid-column: 1 / -1;
           padding: 1rem;
@@ -988,7 +988,7 @@ const toSection = (pre, cal_id, d) => {
   return ([h2, label], idx) => {
     const ev_fn = () => d.tests[label];
     const styles = T.select_colors;
-    const { Div, H2 } = ArrowTags;
+    const { Div, H2 } = arrowTags(html);
     const show = () => !ev_fn(d).hidden;
     const to_style = () => {
       return `
@@ -1001,7 +1001,7 @@ const toSection = (pre, cal_id, d) => {
     }
     const key = `${pre} ${idx}`;
     const props = {
-      html, key, style: to_style
+      key, style: to_style
     }
     const h2_props = {
       style: `margin: 0; padding-left: 0.5rem; cursor: pointer;`,
@@ -1057,7 +1057,7 @@ const toSections = (cal_id) => {
       "Events": "event",
       "People": "person",
       "Sites + People": "basic",
-      "Surveys + Contact": "survey" 
+      "Surveys + Contact": "survey"
     })];
     return labels.map(([k,v]) => {
       return [prefix+k, v];
@@ -1065,9 +1065,10 @@ const toSections = (cal_id) => {
   }
 }
 
-const toPageCore = (fn) => {
-  const { Div } = ArrowTags;
+const toPageCore = (data, fn) => {
+  const { Div } = arrowTags(html);
   const props = {
+    data,
     style: `
       grid-row: 3;
       grid-column: 2;
@@ -1282,7 +1283,7 @@ const observe = (d, id1, id2) => {
     style.type = 'text/css';
     style.innerText = `
       .calendar__navigation > div > button {
-        color: inherit; 
+        color: inherit;
         font-size: 30px;
         background-color: transparent;
       }
@@ -1323,10 +1324,9 @@ const main = () => {
   const cal_id = "event-calendar";
   const data = reactive(toDefault());
   observe(data, id, cal_id);
-  const { render } = ArrowTags;
-  const core = toPageCore(toSections(cal_id));
-  const root = toRoot(core);
-  render(id, html, data, root);
+  const core = toPageCore(data, toSections(cal_id));
+  const el = document.getElementById(id);
+  return toRoot(core)(el);
 }
 
 export default main

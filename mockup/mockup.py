@@ -49,24 +49,23 @@ Client-side single page app
 '''
 
 @nationbuilder.get("/")
-async def open_root():
+async def open_root_html():
     return FileResponse('static/index.html')
 
 @nationbuilder.get("/index.js")
-async def open_root():
+async def open_root_js():
     return FileResponse('static/index.js')
 
 @nationbuilder.get("/country_code.js")
-async def open_root():
+async def open_country_code():
     return FileResponse('static/country_code.js')
-
 
 '''
 Proxy to fetch real/mocked Nationbuilder endpoints
 '''
 
 @nationbuilder.get("/api")
-def open_root(config=Depends(to_config)):
+def open_root_api(config=Depends(to_config)):
     oauth = to_service(config).oauth
     token = to_token()
     if token is None: return vars(config)
